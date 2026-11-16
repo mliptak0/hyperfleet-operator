@@ -214,16 +214,7 @@ differs in a disconnected cluster:
   `BROKER_GOOGLEPUBSUB_PROJECT_ID` (the operator exits at startup otherwise),
   and complete the [Google Pub/Sub](component-install-tracker.md#google-pubsub)
   prerequisites.
-- **Authentication.** API authentication is enabled by default
-  (`spec.api.auth.enabled`). Without `jwkCertSecretRef`, the operator fetches
-  the issuer's OpenID discovery document. That fetch fails in an air-gapped
-  cluster. The operator also refuses an issuer that resolves to a private,
-  loopback, link-local or other non-public address, so an internal issuer on a
-  private address does not work either. Either set
-  `spec.api.auth.enabled: false`, or set `issuer` and `audience` and provide a
-  `jwks.json` Secret through `jwkCertSecretRef`. See
-  [Authentication and JWKS selection](hyperfleetconfig-reference.md#authentication-and-jwks-selection)
-  for the full contract.
+- **Authentication.** `spec.authentication` is always required. Authentication is always on and cannot be disabled; `audience` is the token audience operator-managed components use when calling the API, while `identityProviders` are validated but not yet applied.
 
 Create a valid HyperFleetConfig after its referenced Secrets, database and
 broker are ready. For the `cloud-capi` bundle in `hyperfleet-system`, confirm

@@ -28,6 +28,19 @@ metadata:
               },
               "profile": "small"
             },
+            "authentication": {
+              "audience": "hyperfleet-api",
+              "identityProviders": [
+                {
+                  "issuer": "https://idcs-example.identity.oraclecloud.com",
+                  "tenantDimensions": {
+                    "tenancy_ocid": {
+                      "claim": "tenancy_ocid"
+                    }
+                  }
+                }
+              ]
+            },
             "bundle": "cloud-capi"
           }
         }
