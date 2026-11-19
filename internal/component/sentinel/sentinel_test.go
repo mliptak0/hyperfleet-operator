@@ -404,17 +404,21 @@ func TestRenderDeploymentTokenAudience(t *testing.T) {
 	g.Expect(err).NotTo(HaveOccurred())
 
 	dep := findDeployment(objs, ResourceName(testClustersRt))
-	var audience string
-	for _, v := range dep.Spec.Template.Spec.Volumes {
-		if v.Projected != nil {
-			for _, src := range v.Projected.Sources {
-				if src.ServiceAccountToken != nil {
-					audience = src.ServiceAccountToken.Audience
-				}
-			}
+	// Select the token volume by name: taking the last projected
+	// ServiceAccountToken anywhere in the pod would let an unrelated volume
+	// satisfy the assertion.
+	var tokVol *corev1.Volume
+	for i := range dep.Spec.Template.Spec.Volumes {
+		if dep.Spec.Template.Spec.Volumes[i].Name == apiTokenVolume {
+			tokVol = &dep.Spec.Template.Spec.Volumes[i]
+			break
 		}
 	}
-	g.Expect(audience).To(Equal("custom-audience"))
+	g.Expect(tokVol).NotTo(BeNil())
+	g.Expect(tokVol.Projected).NotTo(BeNil())
+	g.Expect(tokVol.Projected.Sources).To(HaveLen(1))
+	g.Expect(tokVol.Projected.Sources[0].ServiceAccountToken).NotTo(BeNil())
+	g.Expect(tokVol.Projected.Sources[0].ServiceAccountToken.Audience).To(Equal("custom-audience"))
 }
 
 // --- Conditions ---
