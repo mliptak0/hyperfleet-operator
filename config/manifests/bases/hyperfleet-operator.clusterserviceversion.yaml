@@ -16,11 +16,6 @@ metadata:
           },
           "spec": {
             "api": {
-              "auth": {
-                "audience": "hyperfleet-api",
-                "enabled": true,
-                "issuer": "https://issuer.example.com"
-              },
               "database": {
                 "secretRef": {
                   "name": "hyperfleet-db"
