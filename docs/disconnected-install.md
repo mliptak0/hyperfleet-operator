@@ -214,7 +214,12 @@ differs in a disconnected cluster:
   `BROKER_GOOGLEPUBSUB_PROJECT_ID` (the operator exits at startup otherwise),
   and complete the [Google Pub/Sub](component-install-tracker.md#google-pubsub)
   prerequisites.
-- **Authentication.** `spec.authentication` is always required. Authentication is always on and cannot be disabled; `audience` is the token audience operator-managed components use when calling the API, while `identityProviders` are validated but not yet applied.
+- **Authentication.** `spec.authentication` is required; authentication
+  cannot be disabled. The operator accepts and validates these fields but
+  does not enforce them yet: the API runs without JWT validation, and
+  `audience` currently only sets the token projected for the
+  operator-managed components that call the API. Enforcement lands with
+  HYPERFLEET-1534.
 
 Create a valid HyperFleetConfig after its referenced Secrets, database and
 broker are ready. For the `cloud-capi` bundle in `hyperfleet-system`, confirm

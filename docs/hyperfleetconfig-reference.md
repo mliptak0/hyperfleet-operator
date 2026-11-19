@@ -137,13 +137,21 @@ rendered configuration.
 
 ### Identity providers
 
-`spec.authentication` declares the default audience and per-issuer identity
-providers. `audience` defaults to `hyperfleet-api` when empty. Entries are
-keyed by `issuer` (1-64). For each tenant dimension, set exactly one of
-`claim` (JWT claim name) or `value` (fixed string). Omitted `tenantDimensions`
-defaults to `claim` equal to the dimension name.
+`spec.authentication` is required — there is no way to turn authentication
+off. It declares the default audience and the accepted identity providers:
 
-Authentication is always on and cannot be disabled. `spec.authentication.audience` is the token audience that operator-managed components use when calling the API. `spec.authentication.identityProviders` are validated but not yet applied.
+- `audience` is the token audience. It defaults to `hyperfleet-api` when
+  omitted. Today it controls the ServiceAccount token projected for the
+  operator-managed components that call the API.
+- `identityProviders` lists the accepted issuers (1-64, keyed by `issuer`).
+  For each tenant dimension, set exactly one of `claim` (JWT claim name) or
+  `value` (fixed string); dimensions an entry does not list fall back to the
+  bundle preset.
+
+These fields are validated at admission but not enforced yet: the API itself
+runs without JWT validation, so listing an identity provider does not yet
+authenticate API requests. HYPERFLEET-1534 consumes this configuration and
+turns enforcement on.
 
 ### Current sizing limitation
 
