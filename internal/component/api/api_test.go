@@ -209,13 +209,18 @@ func TestRenderDeploymentDatabaseEnv(t *testing.T) {
 func TestRenderDeploymentMigrationInitContainer(t *testing.T) {
 	g := NewWithT(t)
 
-	// Exercise every optional Secret mount so the test proves migration wiring
-	// cannot drift from the runtime container's complete configuration.
+	// Exercise every optional Secret mount (database, TLS, JWKS) so the test
+	// proves migration wiring cannot drift from the runtime container's
+	// complete configuration.
 	cr := testCR()
 	cr.Spec.API.TLS = &hyperfleetv1alpha1.TLSSpec{
 		SecretRef: hyperfleetv1alpha1.SecretReference{Name: testTLSSecret},
 	}
-	dep := deploymentFrom(t, cr)
+	comp := New("img", testNamespace, Options{JWT: &JWTOptions{IssuerURL: testIssuer, Audience: testAudience, JWKSSecretName: testJWKSSecret}})
+	objs, err := comp.Render(context.Background(), cr)
+	g.Expect(err).NotTo(HaveOccurred())
+	dep, ok := byKind(objs)["Deployment"].(*appsv1.Deployment)
+	g.Expect(ok).To(BeTrue())
 
 	spec := dep.Spec.Template.Spec
 	g.Expect(spec.InitContainers).To(HaveLen(1))
@@ -231,7 +236,7 @@ func TestRenderDeploymentMigrationInitContainer(t *testing.T) {
 
 	// The migration must use the exact same image and database/file wiring as
 	// serve. In particular, this keeps the runtime's DB Secret, config, /tmp,
-	// and optional TLS mount behavior in lockstep.
+	// and optional TLS and JWKS mount behavior in lockstep.
 	g.Expect(migration.Image).To(Equal(runtime.Image))
 	g.Expect(migration.ImagePullPolicy).To(Equal(runtime.ImagePullPolicy))
 	g.Expect(migration.WorkingDir).To(Equal(runtime.WorkingDir))
