@@ -193,6 +193,19 @@ var _ = Describe("HyperFleetConfig CRD validation", func() {
 			return k8sClient.Create(ctx, obj)
 		}
 
+		// expectInvalid asserts the create failed admission validation with an
+		// Invalid error, so an unrelated failure (timeout, conflict) cannot
+		// masquerade as a schema rejection. Each wantCause substring must appear
+		// in the reported status cause.
+		expectInvalid := func(err error, wantCause ...string) {
+			GinkgoHelper()
+			ExpectWithOffset(1, err).To(HaveOccurred())
+			ExpectWithOffset(1, errors.IsInvalid(err)).To(BeTrue(), "expected an Invalid admission error, got: %v", err)
+			for _, want := range wantCause {
+				ExpectWithOffset(1, err.Error()).To(ContainSubstring(want))
+			}
+		}
+
 		It("accepts several providers with distinct issuers", func() {
 			Expect(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: providerIssuer, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{testTenancyOCID: {Claim: testTenancyOCID}}},
@@ -259,17 +272,13 @@ var _ = Describe("HyperFleetConfig CRD validation", func() {
 		It("rejects an explicit empty audience", func() { //nolint:goconst
 			u := minimalUnstructured()
 			u.Object["spec"].(map[string]any)["authentication"].(map[string]any)["audience"] = ""
-			err := k8sClient.Create(ctx, u)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("should be at least 1 chars long"))
+			expectInvalid(k8sClient.Create(ctx, u), "should be at least 1 chars long")
 		})
 
 		It("rejects an audience longer than 253", func() {
 			obj := validHyperFleetConfig()
 			obj.Spec.Authentication.Audience = strings.Repeat("a", 254)
-			err := k8sClient.Create(ctx, obj)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("may not be more than 253 bytes"))
+			expectInvalid(k8sClient.Create(ctx, obj), "may not be more than 253 bytes")
 		})
 
 		It("accepts audience at max length 253", func() {
@@ -303,9 +312,9 @@ var _ = Describe("HyperFleetConfig CRD validation", func() {
 
 		It("rejects dimension name longer than 63", func() {
 			dim := strings.Repeat("a", 64)
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: providerIssuer, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{dim: {Claim: "tenancy_ocid"}}},
-			)).To(HaveOccurred())
+			), "dimension name must match")
 		})
 
 		It("rejects more than 8 tenantDimensions", func() {
@@ -313,9 +322,9 @@ var _ = Describe("HyperFleetConfig CRD validation", func() {
 			for i := range 9 {
 				dims["dim"+strings.Repeat("a", i)] = hyperfleetv1alpha1.TenantDimensionSource{Claim: "tenancy_ocid"}
 			}
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: providerIssuer, TenantDimensions: dims},
-			)).To(HaveOccurred())
+			), "must have at most 8 items")
 		})
 
 		It("defaults identityClaim to sub", func() {
@@ -331,15 +340,13 @@ var _ = Describe("HyperFleetConfig CRD validation", func() {
 		It("rejects an authentication block with no identityProviders", func() {
 			u := minimalUnstructured()
 			delete(u.Object["spec"].(map[string]any)["authentication"].(map[string]any), "identityProviders")
-			err := k8sClient.Create(ctx, u)
-			Expect(err).To(HaveOccurred())
+			expectInvalid(k8sClient.Create(ctx, u), "identityProviders", "Required value")
 		})
 
 		It("rejects an empty identityProviders list", func() {
 			obj := validHyperFleetConfig()
-			obj.Spec.Authentication.IdentityProviders = nil
-			err := k8sClient.Create(ctx, obj)
-			Expect(err).To(HaveOccurred())
+			obj.Spec.Authentication.IdentityProviders = []hyperfleetv1alpha1.IdentityProvider{}
+			expectInvalid(k8sClient.Create(ctx, obj), "should have at least 1")
 		})
 
 		It("rejects more than 64 providers", func() {
@@ -347,28 +354,26 @@ var _ = Describe("HyperFleetConfig CRD validation", func() {
 			for i := range 65 {
 				providers = append(providers, hyperfleetv1alpha1.IdentityProvider{Issuer: "https://idp.example.com/p/" + strings.Repeat("a", 5) + "/" + strings.Repeat("x", (i%8)+1) + "/" + strings.Repeat("y", i/8+1)})
 			}
-			Expect(createWithProviders(providers...)).To(HaveOccurred())
+			expectInvalid(createWithProviders(providers...), "must have at most 64 items")
 		})
 
 		It("rejects a duplicate issuer", func() {
-			err := createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: providerIssuer},
 				hyperfleetv1alpha1.IdentityProvider{Issuer: providerIssuer},
-			)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("Duplicate value"))
+			), "Duplicate value")
 		})
 
 		It("rejects a non-https issuer", func() {
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: "http://idp.example.com"},
-			)).To(HaveOccurred())
+			), "issuer must be a valid https URL with a host")
 		})
 
 		It("rejects a scheme-only issuer with no host", func() {
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: "https://"},
-			)).To(HaveOccurred())
+			), "issuer must be a valid https URL with a host")
 		})
 
 		It("rejects an empty issuer", func() {
@@ -376,89 +381,85 @@ var _ = Describe("HyperFleetConfig CRD validation", func() {
 			auth := u.Object["spec"].(map[string]any)["authentication"].(map[string]any)
 			ips := auth["identityProviders"].([]any)
 			ips[0].(map[string]any)["issuer"] = ""
-			err := k8sClient.Create(ctx, u)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("should be at least 1 chars long"))
+			expectInvalid(k8sClient.Create(ctx, u), "should be at least 1 chars long")
 		})
 
 		It("rejects an issuer with a query", func() {
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: "https://idp.example.com/path?a=b"},
-			)).To(HaveOccurred())
+			), "issuer must not contain a query or a fragment")
 		})
 
 		It("rejects an issuer with a fragment", func() {
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: "https://idp.example.com/path#frag"},
-			)).To(HaveOccurred())
+			), "issuer must not contain a query or a fragment")
 		})
 
 		It("rejects an issuer with a trailing slash", func() {
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: "https://idp.example.com/"},
-			)).To(HaveOccurred())
+			), "issuer must not end with a trailing slash")
 		})
 
 		It("rejects an issuer longer than 2048", func() {
 			obj := validHyperFleetConfig()
 			obj.Spec.Authentication.IdentityProviders[0].Issuer = testIssuerURL + "/" + strings.Repeat("a", 2048)
-			err := k8sClient.Create(ctx, obj)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("may not be more than 2048 bytes"))
+			expectInvalid(k8sClient.Create(ctx, obj), "may not be more than 2048 bytes")
 		})
 
 		It("rejects an invalid identityClaim", func() {
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: providerIssuer, IdentityClaim: "bad claim!"},
-			)).To(HaveOccurred())
+			))
 		})
 
 		It("rejects an identityClaim longer than 128", func() {
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: providerIssuer, IdentityClaim: strings.Repeat("a", 129)},
-			)).To(HaveOccurred())
+			))
 		})
 
 		It("rejects a dimension with both claim and value", func() {
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: providerIssuer, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{"tenancy_ocid": {Claim: "tenancy_ocid", Value: "ocid1.tenancy.oc1..aaaa"}}},
-			)).To(HaveOccurred())
+			), "exactly one of claim or value must be set")
 		})
 
 		It("rejects a dimension with neither claim nor value", func() {
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: providerIssuer, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{"tenancy_ocid": {}}},
-			)).To(HaveOccurred())
+			), "exactly one of claim or value must be set")
 		})
 
 		It("rejects an invalid dimension name", func() {
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: providerIssuer, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{"bad/name": {Claim: "tenancy_ocid"}}},
-			)).To(HaveOccurred())
+			), "dimension name must match")
 		})
 
 		It("rejects an invalid claim pattern", func() {
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: providerIssuer, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{"tenancy_ocid": {Claim: "bad claim!"}}},
-			)).To(HaveOccurred())
+			))
 		})
 
 		It("rejects an invalid value pattern", func() {
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: providerIssuer, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{testTenancyOCID: {Value: "bad/value!"}}},
-			)).To(HaveOccurred())
+			))
 		})
 
 		It("rejects a claim longer than 256", func() {
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: providerIssuer, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{"tenancy_ocid": {Claim: strings.Repeat("a", 257)}}},
-			)).To(HaveOccurred())
+			))
 		})
 
 		It("rejects a value longer than 255", func() {
-			Expect(createWithProviders(
+			expectInvalid(createWithProviders(
 				hyperfleetv1alpha1.IdentityProvider{Issuer: providerIssuer, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{testTenancyOCID: {Value: strings.Repeat("a", 256)}}},
-			)).To(HaveOccurred())
+			))
 		})
 
 		It("bumps generation when a provider is added", func() {
