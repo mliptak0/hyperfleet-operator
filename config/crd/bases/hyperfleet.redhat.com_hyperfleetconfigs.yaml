@@ -142,7 +142,7 @@ spec:
                   audience:
                     default: hyperfleet-api
                     description: audience is the token audience HyperFleet requires.
-                      Defaults to "hyperfleet-api" when empty. This field name and
+                      Defaults to "hyperfleet-api" when omitted. This field name and
                       its semantics are a v1alpha1 compatibility commitment.
                     maxLength: 253
                     minLength: 1
@@ -158,8 +158,9 @@ spec:
                         compatibility commitment.
                       properties:
                         identityClaim:
+                          default: sub
                           description: identityClaim is the JWT claim that identifies
-                            the caller. Defaults to "sub" when absent. This field
+                            the caller. Defaults to "sub" when omitted. This field
                             name and its semantics are a v1alpha1 compatibility commitment.
                           maxLength: 128
                           minLength: 1

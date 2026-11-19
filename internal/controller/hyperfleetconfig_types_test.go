@@ -318,14 +318,14 @@ var _ = Describe("HyperFleetConfig CRD validation", func() {
 			)).To(HaveOccurred())
 		})
 
-		It("defaults identityClaim to empty and treats as sub", func() {
+		It("defaults identityClaim to sub", func() {
 			obj := validHyperFleetConfig()
 			obj.Spec.Authentication.IdentityProviders[0].IdentityClaim = ""
 			Expect(k8sClient.Create(ctx, obj)).To(Succeed())
 			DeferCleanup(deleteSingletonAndWait, ctx)
 			got := &hyperfleetv1alpha1.HyperFleetConfig{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: hyperfleetv1alpha1.SingletonName}, got)).To(Succeed())
-			Expect(got.Spec.Authentication.IdentityProviders[0].IdentityClaim).To(Equal(""))
+			Expect(got.Spec.Authentication.IdentityProviders[0].IdentityClaim).To(Equal("sub"))
 		})
 
 		It("rejects an authentication block with no identityProviders", func() {

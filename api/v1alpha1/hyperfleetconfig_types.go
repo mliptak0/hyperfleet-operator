@@ -209,8 +209,9 @@ type IdentityProvider struct {
 	// +kubebuilder:validation:XValidation:rule="!self.endsWith('/')",message="issuer must not end with a trailing slash"
 	Issuer string `json:"issuer"`
 
-	// identityClaim is the JWT claim that identifies the caller. Defaults to "sub" when absent. This field name and its semantics are a v1alpha1 compatibility commitment.
+	// identityClaim is the JWT claim that identifies the caller. Defaults to "sub" when omitted. This field name and its semantics are a v1alpha1 compatibility commitment.
 	//
+	// +kubebuilder:default="sub"
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=128
 	// +kubebuilder:validation:Pattern=`^[A-Za-z0-9._-]+$`
@@ -227,7 +228,7 @@ type IdentityProvider struct {
 
 // AuthenticationSpec declares the token audience and the accepted identity providers. This field name and its semantics are a v1alpha1 compatibility commitment.
 type AuthenticationSpec struct {
-	// audience is the token audience HyperFleet requires. Defaults to "hyperfleet-api" when empty. This field name and its semantics are a v1alpha1 compatibility commitment.
+	// audience is the token audience HyperFleet requires. Defaults to "hyperfleet-api" when omitted. This field name and its semantics are a v1alpha1 compatibility commitment.
 	//
 	// +kubebuilder:default="hyperfleet-api"
 	// +kubebuilder:validation:MinLength=1
