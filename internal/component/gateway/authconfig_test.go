@@ -28,8 +28,10 @@ import (
 	"slices"
 	"testing"
 
+	authorinov1beta3 "github.com/kuadrant/authorino/api/v1beta3"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	hyperfleetv1alpha1 "github.com/openshift-hyperfleet/hyperfleet-operator/api/v1alpha1"
 	"github.com/openshift-hyperfleet/hyperfleet-operator/internal/component/gateway"
@@ -293,9 +295,14 @@ func TestAuthConfig_Deterministic(t *testing.T) {
 	g.Expect(sas).To(Equal(sasBefore))
 }
 
+// render also requires the output to decode strictly into Authorino's schema,
+// so every case doubles as a schema check.
 func render(g *WithT, cr *hyperfleetv1alpha1.HyperFleetConfig, namespace string, model tenant.Model, machineSAs []string) *unstructured.Unstructured {
 	obj, err := gateway.AuthConfig(cr, namespace, model, machineSAs)
 	g.Expect(err).NotTo(HaveOccurred())
+	var decoded authorinov1beta3.AuthConfigSpec
+	g.Expect(runtime.DefaultUnstructuredConverter.FromUnstructuredWithValidation(
+		at[map[string]any](g, obj, "spec"), &decoded, true)).To(Succeed(), "rendered spec does not match Authorino v1beta3 AuthConfigSpec")
 	return obj
 }
 
