@@ -135,19 +135,26 @@ func TestAuthConfig(t *testing.T) {
 		},
 		{
 			// The token's own claim of that name is trusted and reaches the
-			// wristband; the CR reference documents this. A key outside the
-			// preset is not an error, so the dimension then uses the preset.
-			name: "a same-name claim and an unknown dimension key need no override",
+			// wristband; the CR reference documents this.
+			name: "a same-name claim and an unlisted dimension need no override",
 			providers: []hyperfleetv1alpha1.IdentityProvider{
 				{Issuer: issuerA, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{"tenancy_ocid": {Claim: "tenancy_ocid"}}},
-				{Issuer: issuerB, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{"tenancy-ocid": {Value: "ocid-b"}}},
-				idp(issuerC),
+				idp(issuerB),
 			},
 			check: func(g *WithT, obj *unstructured.Unstructured) {
-				for _, issuer := range []string{issuerA, issuerB, issuerC} {
+				for _, issuer := range []string{issuerA, issuerB} {
 					g.Expect(overridesOf(g, obj, issuer)).To(HaveLen(2), issuer) // hf_system and hf_identity only
 				}
 			},
+		},
+		{
+			// Falling back to the preset here would trust the token's tenancy_ocid
+			// instead of the fixed value the CR meant to set.
+			name: "a misspelled dimension key is rejected",
+			providers: []hyperfleetv1alpha1.IdentityProvider{
+				{Issuer: issuerA, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{"tenancy-ocid": {Value: "ocid-a"}}},
+			},
+			wantErr: `unknown tenant dimension "tenancy-ocid"; the bundle defines tenancy_ocid, compartment_id`,
 		},
 		{
 			name:      "cloud-capi requires the tenancy of human callers",

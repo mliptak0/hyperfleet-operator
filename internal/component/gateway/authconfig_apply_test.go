@@ -84,14 +84,23 @@ func TestAuthConfig_AcceptedByAuthorinoCRD(t *testing.T) {
 		UID:  types.UID("00000000-0000-0000-0000-000000000001"),
 	}}
 
-	providers := []hyperfleetv1alpha1.IdentityProvider{
-		{Issuer: issuerA, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{"tenancy_ocid": {Value: "ocid-a"}}},
-		{Issuer: issuerB, IdentityClaim: "preferred_username", TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{
-			"tenancy_ocid": {Value: "ocid-b"}, "compartment_id": {Claim: "comp"},
-		}},
+	// Each bundle names its own dimensions; a key from another bundle is rejected.
+	providers := map[hyperfleetv1alpha1.BundleType][]hyperfleetv1alpha1.IdentityProvider{
+		hyperfleetv1alpha1.BundleCloudCAPI: {
+			{Issuer: issuerA, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{"tenancy_ocid": {Value: "ocid-a"}}},
+			{Issuer: issuerB, IdentityClaim: "preferred_username", TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{
+				"tenancy_ocid": {Value: "ocid-b"}, "compartment_id": {Claim: "comp"},
+			}},
+		},
+		hyperfleetv1alpha1.BundleOnPremAgent: {
+			{Issuer: issuerA, TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{"org": {Value: "acme"}}},
+			{Issuer: issuerB, IdentityClaim: "preferred_username", TenantDimensions: map[string]hyperfleetv1alpha1.TenantDimensionSource{
+				"org": {Value: "globex"}, "project": {Claim: "proj"},
+			}},
+		},
 	}
 	applyTo := func(g *WithT, bundle hyperfleetv1alpha1.BundleType, mutate func(*unstructured.Unstructured) error) (*unstructured.Unstructured, error) {
-		obj := render(g, newCR("", providers...), testNamespace, modelFor(g, bundle), []string{"hyperfleet-sentinel-clusters"})
+		obj := render(g, newCR("", providers[bundle]...), testNamespace, modelFor(g, bundle), []string{"hyperfleet-sentinel-clusters"})
 		if mutate != nil {
 			g.Expect(mutate(obj)).To(Succeed(), "fixture mutation failed")
 		}

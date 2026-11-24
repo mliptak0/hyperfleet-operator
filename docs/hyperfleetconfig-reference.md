@@ -201,9 +201,9 @@ identityProviders:
         value: tenant-a   # fixed; the token's tenancy_ocid is ignored
 ```
 
-A dimension key that is not in the table above is ignored without an error, and
-the dimension it was meant for then uses the preset. Check the spelling of
-`tenancy_ocid`, `compartment_id`, `org` and `project`.
+A dimension key that is not in the table for the bundle is an error when the
+gateway configuration is rendered, so a misspelled key cannot silently fall back
+to the preset.
 
 ### Current sizing limitation
 

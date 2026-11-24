@@ -27,8 +27,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -121,6 +123,15 @@ func authentication(audience string, providers []hyperfleetv1alpha1.IdentityProv
 		}
 		issuers[issuer] = p.Issuer
 
+		// A misspelled key must not silently fall back to the preset: for a
+		// provider whose administrators control the claim, that would defeat the
+		// tenant binding the CR meant to set.
+		for _, key := range slices.Sorted(maps.Keys(p.TenantDimensions)) {
+			if !slices.ContainsFunc(model, func(d tenant.Dimension) bool { return d.Key == key }) {
+				return nil, fmt.Errorf("identity provider %q sets unknown tenant dimension %q; the bundle defines %s", p.Issuer, key, dimensionKeys(model))
+			}
+		}
+
 		identityClaim := p.IdentityClaim
 		if identityClaim == "" {
 			identityClaim = "sub"
@@ -186,6 +197,14 @@ func authorization(namespace string, model tenant.Model, machineSAs []string) ma
 		}
 	}
 	return rules
+}
+
+func dimensionKeys(model tenant.Model) string {
+	keys := make([]string, len(model))
+	for i, d := range model {
+		keys[i] = d.Key
+	}
+	return strings.Join(keys, ", ")
 }
 
 func response(namespace, audience string, model tenant.Model) map[string]any {
