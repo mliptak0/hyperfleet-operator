@@ -160,7 +160,7 @@ func TestAuthConfig(t *testing.T) {
 			name:      "cloud-capi requires the tenancy of human callers",
 			providers: idps(issuerA),
 			check: requireTenantRule(hyperfleetv1alpha1.BundleCloudCAPI,
-				[]string{"require-identity", "restrict-system-subjects", "require-tenancy-ocid"},
+				[]string{"require-identity", "restrict-system-subjects", "require-tenancy-ocid", "require-string-tenancy-ocid", "require-string-compartment-id"},
 				"require-tenancy-ocid", "auth.identity.tenancy_ocid"),
 		},
 		{
@@ -168,7 +168,7 @@ func TestAuthConfig(t *testing.T) {
 			bundle:    hyperfleetv1alpha1.BundleOnPremAgent,
 			providers: idps(issuerA),
 			check: requireTenantRule(hyperfleetv1alpha1.BundleOnPremAgent,
-				[]string{"require-identity", "restrict-system-subjects", "require-org"},
+				[]string{"require-identity", "restrict-system-subjects", "require-org", "require-string-org", "require-string-project"},
 				"require-org", "auth.identity.org_id"),
 		},
 		{

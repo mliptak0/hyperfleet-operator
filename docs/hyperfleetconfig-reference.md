@@ -184,9 +184,14 @@ Each provider gets its value for a dimension from, in order:
 A missing required claim makes the gateway reject the request for human
 callers. A missing optional claim leaves that dimension empty, so the API scopes
 that caller by its remaining dimensions only and it matches resources in every
-value of the missing one. The API expects every caller in a deployment to
-resolve the same dimensions (see its operator guide), so make sure the provider
-always sets the optional claims you rely on.
+value of the missing one. That broader visibility is a supported capability
+([ADR-0027](https://github.com/openshift-hyperfleet/architecture/blob/main/hyperfleet/adrs/0027-tenant-dimension-cardinality.md)),
+so only let a provider omit an optional claim if it may grant that wider scope.
+
+A dimension claim must be a single string. If the token carries anything else
+for it, such as an array from a groups claim mapped onto a dimension, the
+gateway denies the request: there is no safe way to pick one value. Map a
+single-valued claim, or set `value`.
 
 Trusting the preset claim is right only when the provider's administrators
 cannot set it themselves, for example a claim the identity service fills in.

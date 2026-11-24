@@ -192,9 +192,15 @@ func authorization(namespace string, model tenant.Model, machineSAs []string) ma
 		"restrict-system-subjects": rule(when(selHFSystem, "eq", systemTrue), "auth.identity.user.username", "matches", subjectPattern),
 	}
 	for _, d := range model {
+		name := strings.ReplaceAll(d.Key, "_", "-")
 		if d.Required {
-			rules["require-"+strings.ReplaceAll(d.Key, "_", "-")] = rule(humanOnly, "auth.identity."+d.Claim, "neq", "")
+			rules["require-"+name] = rule(humanOnly, "auth.identity."+d.Claim, "neq", "")
 		}
+		// A dimension claim is one string. The API rejects any other type, and an
+		// array (a groups claim mapped onto a dimension, say) has no safe single
+		// value to pick, so such a token is denied here.
+		rules["require-string-"+name] = predicateRule(humanOnly,
+			fmt.Sprintf("!(%[1]q in auth.identity) || type(auth.identity[%[1]q]) == string", d.Claim))
 	}
 	return rules
 }
@@ -292,6 +298,13 @@ func when(sel, operator, value string) map[string]any {
 func literal(v string) map[string]any    { return map[string]any{"value": v} }
 func expression(e string) map[string]any { return map[string]any{"expression": e} }
 func selector(s string) map[string]any   { return map[string]any{"selector": s} }
+
+func predicateRule(guard map[string]any, predicate string) map[string]any {
+	return map[string]any{
+		"when":            []any{guard},
+		"patternMatching": map[string]any{"patterns": []any{map[string]any{"predicate": predicate}}},
+	}
+}
 
 func rule(guard map[string]any, sel, operator, value string) map[string]any {
 	return map[string]any{
