@@ -22,6 +22,8 @@ package gateway_test
 
 import (
 	"cmp"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"maps"
 	"regexp"
@@ -48,6 +50,11 @@ const (
 
 func TestAuthConfig(t *testing.T) {
 	const saPrefix = "system:serviceaccount:" + testNamespace + ":"
+	// The first issuer embeds the 8-character hash suffix that the third one
+	// gets when it collides with the second one's block key.
+	third := "https://idp.example.com/a/b"
+	sum := sha256.Sum256([]byte(third))
+	suffixCollision := [3]string{"https://idp.example.com/a-b-" + hex.EncodeToString(sum[:])[:8], "https://idp.example.com/a-b", third}
 	tests := []struct {
 		name       string
 		bundle     hyperfleetv1alpha1.BundleType // default cloud-capi
@@ -198,6 +205,13 @@ func TestAuthConfig(t *testing.T) {
 			name:      "issuers that differ only by path case get distinct blocks",
 			providers: idps("https://idp.example.com/realms/Prod", "https://idp.example.com/realms/prod"),
 			check:     requireOwnBlocks("https://idp.example.com/realms/Prod", "https://idp.example.com/realms/prod"),
+		},
+		{
+			// The third issuer's suffixed key equals the first issuer's key, which
+			// must not be overwritten.
+			name:      "a suffixed block key that another issuer already holds is not overwritten",
+			providers: idps(suffixCollision[0], suffixCollision[1], suffixCollision[2]),
+			check:     requireOwnBlocks(suffixCollision[:]...),
 		},
 		{
 			name:      "an issuer that sanitizes to the machine block key gets its own block",

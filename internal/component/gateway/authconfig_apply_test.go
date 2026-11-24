@@ -90,10 +90,10 @@ func TestAuthConfig_AcceptedByAuthorinoCRD(t *testing.T) {
 			"tenancy_ocid": {Value: "ocid-b"}, "compartment_id": {Claim: "comp"},
 		}},
 	}
-	applyTo := func(g *WithT, bundle hyperfleetv1alpha1.BundleType, mutate func(*unstructured.Unstructured)) (*unstructured.Unstructured, error) {
+	applyTo := func(g *WithT, bundle hyperfleetv1alpha1.BundleType, mutate func(*unstructured.Unstructured) error) (*unstructured.Unstructured, error) {
 		obj := render(g, newCR("", providers...), testNamespace, modelFor(g, bundle), []string{"hyperfleet-sentinel-clusters"})
 		if mutate != nil {
-			mutate(obj)
+			g.Expect(mutate(obj)).To(Succeed(), "fixture mutation failed")
 		}
 		return obj, apply.Objects(t.Context(), c, nil, owner, s, []client.Object{obj})
 	}
@@ -101,7 +101,7 @@ func TestAuthConfig_AcceptedByAuthorinoCRD(t *testing.T) {
 	tests := []struct {
 		name    string
 		bundle  hyperfleetv1alpha1.BundleType
-		mutate  func(*unstructured.Unstructured)
+		mutate  func(*unstructured.Unstructured) error
 		wantErr string
 	}{
 		{name: "cloud-capi AuthConfig is valid", bundle: hyperfleetv1alpha1.BundleCloudCAPI},
@@ -111,9 +111,9 @@ func TestAuthConfig_AcceptedByAuthorinoCRD(t *testing.T) {
 			// cases above mean something.
 			name:   "an operator outside Authorino's enum is rejected",
 			bundle: hyperfleetv1alpha1.BundleCloudCAPI,
-			mutate: func(obj *unstructured.Unstructured) {
+			mutate: func(obj *unstructured.Unstructured) error {
 				bad := []any{map[string]any{"selector": "auth.identity.hf_system", "operator": "nq", "value": "true"}}
-				_ = unstructured.SetNestedSlice(obj.Object, bad, "spec", "authorization", "require-identity", "when")
+				return unstructured.SetNestedSlice(obj.Object, bad, "spec", "authorization", "require-identity", "when")
 			},
 			wantErr: `Unsupported value: "nq"`,
 		},
@@ -122,17 +122,17 @@ func TestAuthConfig_AcceptedByAuthorinoCRD(t *testing.T) {
 			// pruning the field, which would silently stop checking iss.
 			name:   "a field unknown to the CRD is rejected, not pruned",
 			bundle: hyperfleetv1alpha1.BundleCloudCAPI,
-			mutate: func(obj *unstructured.Unstructured) {
+			mutate: func(obj *unstructured.Unstructured) error {
 				key := humanBlocks(NewWithT(t), obj)[issuerA]
-				_ = unstructured.SetNestedField(obj.Object, issuerA, "spec", "authentication", key, "jwt", "issuerFromTheFuture")
+				return unstructured.SetNestedField(obj.Object, issuerA, "spec", "authentication", key, "jwt", "issuerFromTheFuture")
 			},
 			wantErr: "field not declared in schema",
 		},
 		{
 			name:   "a string tokenDuration is rejected",
 			bundle: hyperfleetv1alpha1.BundleCloudCAPI,
-			mutate: func(obj *unstructured.Unstructured) {
-				_ = unstructured.SetNestedField(obj.Object, "300", "spec", "response", "success", "dynamicMetadata", "wristband", "wristband", "tokenDuration")
+			mutate: func(obj *unstructured.Unstructured) error {
+				return unstructured.SetNestedField(obj.Object, "300", "spec", "response", "success", "dynamicMetadata", "wristband", "wristband", "tokenDuration")
 			},
 			wantErr: "expected numeric",
 		},

@@ -182,7 +182,11 @@ Each provider gets its value for a dimension from, in order:
    provider chooses the tenant.
 
 A missing required claim makes the gateway reject the request for human
-callers. A missing optional claim leaves that dimension empty.
+callers. A missing optional claim leaves that dimension empty, so the API scopes
+that caller by its remaining dimensions only and it matches resources in every
+value of the missing one. The API expects every caller in a deployment to
+resolve the same dimensions (see its operator guide), so make sure the provider
+always sets the optional claims you rely on.
 
 Trusting the preset claim is right only when the provider's administrators
 cannot set it themselves, for example a claim the identity service fills in.

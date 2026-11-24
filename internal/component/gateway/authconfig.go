@@ -247,7 +247,15 @@ func providerKey(issuer string, blocks map[string]any) string {
 	key := strings.Trim(nonAlnum.ReplaceAllString(raw, "-"), "-")
 	if _, taken := blocks[key]; taken {
 		sum := sha256.Sum256([]byte(issuer))
-		key += "-" + hex.EncodeToString(sum[:])[:8]
+		base := key + "-" + hex.EncodeToString(sum[:])[:8]
+		// The suffixed key can itself belong to an issuer that sanitizes to it.
+		key = base
+		for n := 2; ; n++ {
+			if _, taken := blocks[key]; !taken {
+				return key
+			}
+			key = fmt.Sprintf("%s-%d", base, n)
+		}
 	}
 	return key
 }
