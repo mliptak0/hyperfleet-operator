@@ -39,7 +39,7 @@ import (
 func TestAuthConfig_DimensionClaims(t *testing.T) {
 	tests := []struct {
 		name       string
-		claims     map[string]any // dimension claims of the identity
+		claims     map[string]any // dimension claims of the identity, plus hf_identity when it is not "alice"
 		wantDenied string         // rule that denies the request; no wristband is issued then
 		wantClaims map[string]any // dimension claims of the wristband
 	}{
@@ -70,6 +70,16 @@ func TestAuthConfig_DimensionClaims(t *testing.T) {
 			wantDenied: "require-string-compartment-id",
 		},
 		{
+			name:       "an array-valued identity claim is denied",
+			claims:     map[string]any{"tenancy_ocid": "t1", "hf_identity": []any{"alice", "bob"}},
+			wantDenied: "require-identity",
+		},
+		{
+			name:       "a numeric identity claim is denied",
+			claims:     map[string]any{"tenancy_ocid": "t1", "hf_identity": 42},
+			wantDenied: "require-identity",
+		},
+		{
 			name:       "a numeric claim is denied",
 			claims:     map[string]any{"tenancy_ocid": 5},
 			wantDenied: "require-string-tenancy-ocid",
@@ -83,7 +93,9 @@ func TestAuthConfig_DimensionClaims(t *testing.T) {
 
 			identity := maps.Clone(tt.claims)
 			identity["hf_system"] = "false" // always set by the gateway for human callers
-			identity["hf_identity"] = "alice"
+			if _, ok := identity["hf_identity"]; !ok {
+				identity["hf_identity"] = "alice"
+			}
 			auth := authJSON(g, identity)
 
 			rules := at[map[string]any](g, obj, "spec", "authorization")

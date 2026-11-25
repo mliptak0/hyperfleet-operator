@@ -189,7 +189,15 @@ func authorization(namespace string, model tenant.Model, machineSAs []string) ma
 	subjectPattern := fmt.Sprintf("^system:serviceaccount:%s:(%s)$", regexp.QuoteMeta(namespace), strings.Join(quoted, "|"))
 
 	rules := map[string]any{
-		"require-identity":         rule(humanOnly, selHFIdentity, "neq", ""),
+		// hf_identity is an override, so the type check sees the value the
+		// wristband will carry: a numeric sub or a groups array is denied here.
+		"require-identity": map[string]any{
+			"when": []any{humanOnly},
+			"patternMatching": map[string]any{"patterns": []any{
+				when(selHFIdentity, "neq", ""),
+				map[string]any{"predicate": `type(auth.identity["hf_identity"]) == string`},
+			}},
+		},
 		"restrict-system-subjects": rule(when(selHFSystem, "eq", systemTrue), "auth.identity.user.username", "matches", subjectPattern),
 	}
 	for _, d := range model {
