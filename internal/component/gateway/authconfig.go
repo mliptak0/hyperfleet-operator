@@ -79,11 +79,12 @@ func AuthConfig(cr *hyperfleetv1alpha1.HyperFleetConfig, namespace string, model
 
 	obj := &unstructured.Unstructured{Object: map[string]any{
 		"spec": map[string]any{
+			// Authorino enforces host uniqueness across its watch scope, so only
+			// namespace-qualified names are claimed; a bare Service name or
+			// localhost would collide with another install or AuthConfig.
 			"hosts": []any{
-				gatewayServiceName,
 				fmt.Sprintf("%s.%s.svc", gatewayServiceName, namespace),
 				fmt.Sprintf("%s.%s.svc.cluster.local", gatewayServiceName, namespace),
-				"localhost",
 			},
 			"authentication": authBlocks,
 			"authorization":  authorization(namespace, model, machineSAs),

@@ -190,10 +190,8 @@ func TestAuthConfig(t *testing.T) {
 				g.Expect(obj.GetName()).To(Equal(gateway.AuthConfigName))
 				g.Expect(obj.GetNamespace()).To(Equal("other-ns"))
 				g.Expect(at[[]any](g, obj, "spec", "hosts")).To(Equal([]any{
-					"hyperfleet-gateway",
 					"hyperfleet-gateway.other-ns.svc",
 					"hyperfleet-gateway.other-ns.svc.cluster.local",
-					"localhost",
 				}))
 				g.Expect(at[string](g, obj, "spec", "response", "success", "dynamicMetadata", "wristband", "wristband", "issuer")).
 					To(Equal(gateway.WristbandIssuer("other-ns")))
